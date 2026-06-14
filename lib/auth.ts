@@ -9,7 +9,6 @@ import { prisma } from "./prisma";
 import { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
-  // @ts-expect-error — @auth/prisma-adapter types are slightly ahead of next-auth v4
   adapter: PrismaAdapter(prisma),
 
   session: { strategy: "jwt" },
