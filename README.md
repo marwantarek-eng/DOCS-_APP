@@ -45,10 +45,12 @@ yarn dev
 pnpm dev
 # or
 bun dev
+
+```
+
 Open http://localhost:3000 with your browser to see the result.
 
 You can start editing the page by modifying app/page.tsx. The page auto-updates as you edit the file.
-
 👥 Meet the Team
 We are a team of passionate, newly graduated engineers specializing in Full-Stack development and Cloud/DevOps infrastructure, dedicated to modernizing healthcare tech in the region:
 
