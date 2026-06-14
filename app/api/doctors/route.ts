@@ -1,62 +1,6 @@
 // src/app/api/doctors/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../lib/auth";
-import { prisma } from "../../../lib/prisma";
-import { z } from "zod";
-import { Specialty } from "@prisma/client";
-
-// ─── GET /api/doctors ──────────────────────────
-// Query params: ?specialty=ORTHOPAEDICS&location=Cairo&search=marwan&page=1&limit=20
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const specialty = searchParams.get("specialty") as Specialty | null;
-    const location = searchParams.get("location");
-    const search = searchParams.get("search");
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-    const limit = Math.min(50, parseInt(searchParams.get("limit") ?? "20"));
-
-    const where = {
-      role: "DOCTOR" as const,
-      isVerified: true,
-      ...(specialty && Object.values(Specialty).includes(specialty) && { specialty }),
-      ...(location && { location: { contains: location, mode: "insensitive" as const } }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: "insensitive" as const } },
-          { bio: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
-    };
-
-    const [doctors, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        select: {
-          id: true,
-          name: true,
-          specialty: true,
-          location: true,
-          trustScore: true,
-          yearsExp: true,
-          isVerified: true,
-          image: true,
-          bio: true,
-          _count: {
-            select: {
-              cases: { where: { isPublished: true } },
-              endorsementsReceived: true,
-            },
-          },
-        },
-        orderBy: [{ trustScore: "desc" }, { createdAt: "asc" }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.user.count({ where }),
-    ]);
 
     return NextResponse.json({
       doctors,
