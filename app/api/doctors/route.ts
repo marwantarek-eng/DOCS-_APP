@@ -84,7 +84,7 @@ const updateProfileSchema = z.object({
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== "DOCTOR") {
+    if (!session?.user || (session.user as any).role !== "DOCTOR") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
