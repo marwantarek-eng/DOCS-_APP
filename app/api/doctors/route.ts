@@ -1,9 +1,9 @@
 // src/app/api/doctors/route.ts
 
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { Specialty } from "@prisma/client";
 
@@ -58,76 +58,63 @@ export async function GET(req: NextRequest) {
       prisma.user.count({ where }),
     ]);
 
-    const formatted = doctors.map((d) => ({
-      id: d.id,
-      name: d.name,
-      specialty: d.specialty,
-      location: d.location,
-      trustScore: d.trustScore,
-      yearsExp: d.yearsExp,
-      isVerified: d.isVerified,
-      image: d.image,
-      bio: d.bio,
-      casesCount: d._count.cases,
-      endorsementCount: d._count.endorsementsReceived,
-    }));
-
     return NextResponse.json({
-      doctors: formatted,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      doctors,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
-  } catch (err) {
-    console.error("[GET /api/doctors]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("GET_DOCTORS_ERROR", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
-// ─── PUT /api/doctors ──────────────────────────
-// Update authenticated doctor's profile
-
-const UpdateSchema = z.object({
-  name: z.string().min(2).max(100).optional(),
+// ─── PUT /api/doctors (Update Profile) ──────────
+const updateProfileSchema = z.use({
+  name: z.string().min(2).optional(),
   bio: z.string().max(500).optional(),
-  location: z.string().max(100).optional(),
-  specialty: z.nativeEnum(Specialty).optional(),
-  yearsExp: z.number().int().min(0).max(60).optional(),
-  whatsappUrl: z.string().url().optional().or(z.literal("")),
-  instagramUrl: z.string().url().optional().or(z.literal("")),
-  facebookUrl: z.string().url().optional().or(z.literal("")),
-  websiteUrl: z.string().url().optional().or(z.literal("")),
+  location: z.string().optional(),
+  yearsExp: z.number().min(0).max(60).optional(),
 });
 
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user || session.user.role !== "DOCTOR") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = (session.user as { id: string }).id;
-    const doctor = await prisma.user.findUnique({ where: { id: userId } });
-    if (!doctor || doctor.role !== "DOCTOR") {
-      return NextResponse.json({ error: "Forbidden — doctors only" }, { status: 403 });
     }
 
     const body = await req.json();
-    const parsed = UpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
-    }
+    const validatedData = updateProfileSchema.parse(body);
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: parsed.data,
+    const updatedDoctor = await prisma.user.update({
+      where: { id: session.user.id },
+      data: validatedData,
       select: {
-        id: true, name: true, specialty: true, location: true,
-        bio: true, trustScore: true, yearsExp: true, isVerified: true,
-        whatsappUrl: true, instagramUrl: true, facebookUrl: true, websiteUrl: true,
+        id: true,
+        name: true,
+        bio: true,
+        location: true,
+        yearsExp: true,
       },
     });
 
-    return NextResponse.json(updated);
-  } catch (err) {
-    console.error("[PUT /api/doctors]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(updatedDoctor);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors }, { status: 400 });
+    }
+    console.error("PUT_DOCTORS_ERROR", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
