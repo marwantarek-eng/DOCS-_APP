@@ -1,0 +1,195 @@
+// ══════════════════════════════════════════════
+// DOCS — Prisma Schema
+// PostgreSQL + Prisma ORM
+// ══════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────
+
+enum Role {
+  DOCTOR
+  PATIENT
+}
+
+enum BadgeType {
+  SURGICAL_EXCELLENCE
+  BRILLIANT_DIAGNOSIS
+  QUICK_INTERVENTION
+  CLINICAL_ACUMEN
+  RESEARCH_LEADER
+}
+
+enum Specialty {
+  ORTHOPAEDICS
+  DERMATOLOGY
+  CARDIOLOGY
+  INTERNAL_MEDICINE
+  PLASTIC_SURGERY
+  NEUROLOGY
+  OPHTHALMOLOGY
+  GYNAECOLOGY
+  PAEDIATRICS
+  PSYCHIATRY
+  OTHER
+}
+
+// ─── Models ────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  image         String?
+  role          Role      @default(PATIENT)
+
+  // Doctor-specific
+  syndicateId   String?   @unique
+  isVerified    Boolean   @default(false)
+  specialty     Specialty?
+  location      String?
+  bio           String?
+  trustScore    Int       @default(0)
+  yearsExp      Int?
+  whatsappUrl   String?
+  instagramUrl  String?
+  facebookUrl   String?
+  websiteUrl    String?
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // App relations
+  cases         Case[]
+  folders       Folder[]
+  endorsementsSent     Endorsement[] @relation("EndorsementSender")
+  endorsementsReceived Endorsement[] @relation("EndorsementReceiver")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([specialty])
+  @@index([location])
+  @@index([role])
+}
+
+model Case {
+  id                String    @id @default(cuid())
+  doctorId          String
+  doctor            User      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  folderId          String?
+  folder            Folder?   @relation(fields: [folderId], references: [id])
+
+  titleAr           String
+  titleEn           String
+  challengeAr       String    @db.Text
+  challengeEn       String    @db.Text
+  actionAr          String    @db.Text
+  actionEn          String    @db.Text
+  outcomeAr         String    @db.Text
+  outcomeEn         String    @db.Text
+
+  beforeImageUrl    String?
+  afterImageUrl     String?
+  beforeLabelAr     String?
+  beforeLabelEn     String?
+  afterLabelAr      String?
+  afterLabelEn      String?
+  beforeBgColor     String?   @default("#FEE2E2")
+  afterBgColor      String?   @default("#DCFCE7")
+
+  views             Int       @default(0)
+  complianceAccepted Boolean  @default(false)
+  isPublished       Boolean   @default(true)
+
+  endorsements      Endorsement[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([doctorId])
+  @@index([folderId])
+  @@index([createdAt])
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  nameAr    String
+  nameEn    String
+  icon      String   @default("📁")
+
+  cases     Case[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorId])
+}
+
+model Endorsement {
+  id         String    @id @default(cuid())
+  senderId   String
+  sender     User      @relation("EndorsementSender",   fields: [senderId],   references: [id])
+  receiverId String
+  receiver   User      @relation("EndorsementReceiver", fields: [receiverId], references: [id])
+  caseId     String?
+  case       Case?     @relation(fields: [caseId], references: [id])
+  badgeType  BadgeType
+
+  createdAt  DateTime  @default(now())
+
+  @@unique([senderId, caseId, badgeType])
+  @@index([receiverId])
+  @@index([caseId])
+}
+
+// ─── NextAuth required models ──────────────────
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
